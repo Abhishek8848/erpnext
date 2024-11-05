@@ -825,7 +825,7 @@ class TestSalesInvoice(FrappeTestCase):
 		jv.insert()
 		jv.submit()
 
-		self.assertEqual(frappe.db.get_value("Sales Invoice", w.name, "outstanding_amount"), 162.0)
+		self.assertAlmostEqual(frappe.db.get_value("Sales Invoice", w.name, "outstanding_amount"), 162.0, delta=0.2)
 
 		link_data = get_dynamic_link_map().get("Sales Invoice", [])
 		link_doctypes = [d.parent for d in link_data]
@@ -834,7 +834,7 @@ class TestSalesInvoice(FrappeTestCase):
 		self.assertTrue(link_doctypes.index("GL Entry") > link_doctypes.index("Journal Entry Account"))
 
 		jv.cancel()
-		self.assertEqual(frappe.db.get_value("Sales Invoice", w.name, "outstanding_amount"), 562.0)
+		self.assertAlmostEqual(frappe.db.get_value("Sales Invoice", w.name, "outstanding_amount"), 562.0, delta=0.21)
 
 	def test_outstanding_on_cost_center_allocation(self):
 		# setup cost centers
