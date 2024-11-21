@@ -5,13 +5,28 @@ erpnext.accounts.unreconcile_payment = {
 		if (frm.doc.docstatus == 1) {
 			if (
 				(frm.doc.doctype == "Journal Entry" && frm.doc.voucher_type != "Journal Entry") ||
-				!["Purchase Invoice", "Sales Invoice", "Journal Entry", "Payment Entry"].includes(
-					frm.doc.doctype
-				)
+				![
+					"Purchase Invoice",
+					"Sales Invoice",
+					"Journal Entry",
+					"Payment Entry",
+					"Payment Reconciliation Record", // Added custom Doctype
+				].includes(frm.doc.doctype)
 			) {
 				return;
 			}
-
+			if (frm.doc.doctype === "Payment Reconciliation Record") {
+				// No need for check for references
+				frm.add_custom_button(
+					__("UnReconcile"),
+					function () {
+							// Directly unreconcile all allocations for Payment Reconciliation Record
+							erpnext.accounts.unreconcile_payment.unreconcile_all_allocations(frm);
+					},
+					__("Actions")
+				);
+			} else {
+				// Check for references and then pop up the button
 			frappe.call({
 				method: "erpnext.accounts.doctype.unreconcile_payment.unreconcile_payment.doc_has_references",
 				args: {
@@ -30,7 +45,29 @@ erpnext.accounts.unreconcile_payment = {
 					}
 				},
 			});
+			}
 		}
+	},
+
+	unreconcile_all_allocations(frm) {
+		// Prepare data for unreconciling all allocations
+		let allocation_data = frm.doc.allocation.map((allocation) => {
+			return {
+				company: frm.doc.company,
+				voucher_type: allocation.reference_type,
+				voucher_no: allocation.reference_name,
+				against_voucher_type: allocation.invoice_type,
+				against_voucher_no: allocation.invoice_number,
+			};
+		});
+
+		// Trigger the server-side method to unreconcile
+		frappe.call({
+			method: "erpnext.accounts.doctype.unreconcile_payment.unreconcile_payment.create_unreconcile_doc_for_selection",
+			args: {
+				selections: allocation_data,
+			}
+		});
 	},
 
 	build_selection_map(frm, selections) {
@@ -69,7 +106,7 @@ erpnext.accounts.unreconcile_payment = {
 				{
 					label: __("Voucher Type"),
 					fieldname: "voucher_type",
-					fieldtype: "Link",
+					fieldtype: "Dynamic Link",
 					options: "DocType",
 					in_list_view: 1,
 					read_only: 1,
@@ -77,7 +114,7 @@ erpnext.accounts.unreconcile_payment = {
 				{
 					label: __("Voucher No"),
 					fieldname: "voucher_no",
-					fieldtype: "Dynamic Link",
+					fieldtype: "Link",
 					options: "voucher_type",
 					in_list_view: 1,
 					read_only: 1,
