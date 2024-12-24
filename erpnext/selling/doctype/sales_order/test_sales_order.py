@@ -2449,21 +2449,21 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
                         selling_price_list='Standard Selling', item_code='Monitor', qty=4, rate=5000)
 		so.save()
 		so.submit()
-  
+
 		self.assertEqual(so.status, "To Deliver and Bill", "Sales Order not created")
-  
+
 		si = make_sales_invoice(so.name)
 		si.save()
 		si.submit()
 
 		self.assertEqual(si.status, "Unpaid", "Sales Invoice not created")
-  
+
 		si_acc_credit = frappe.db.get_value('GL Entry', {'voucher_type': 'Sales Invoice', 'voucher_no': si.name, 'account': 'Sales - FC'}, 'credit')
 		self.assertEqual(si_acc_credit, 20000)
 
 		si_acc_debit = frappe.db.get_value('GL Entry', {'voucher_type': 'Sales Invoice', 'voucher_no': si.name, 'account': 'Debtors - FC'}, 'debit')
 		self.assertEqual(si_acc_debit, 20000)
-  
+
 		from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_delivery_note
 		dn1 = make_delivery_note(si.name)
 		dn1.get("items")[0].qty = 2
@@ -2480,7 +2480,7 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 
 		dn_acc_debit1 = frappe.db.get_value('GL Entry', {'voucher_type': 'Delivery Note', 'voucher_no': dn1.name, 'account': 'Cost of Goods Sold - FC'}, 'debit')
 		self.assertEqual(dn_acc_debit1, monitor_sl1[0].get("valuation_rate") * 2)
-  
+
 		dn2 = make_delivery_note(si.name)
 		dn2.save()
 		dn2.submit()
@@ -2495,7 +2495,6 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 
 		dn_acc_debit2 = frappe.db.get_value('GL Entry', {'voucher_type': 'Delivery Note', 'voucher_no': dn2.name, 'account': 'Cost of Goods Sold - FC'}, 'debit')
 		self.assertEqual(dn_acc_debit2, monitor_sl2[0].get("valuation_rate") * 2)
-
 
 def automatically_fetch_payment_terms(enable=1):
 	accounts_settings = frappe.get_doc("Accounts Settings")
