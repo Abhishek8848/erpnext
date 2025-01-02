@@ -4197,7 +4197,7 @@ class TestSalesInvoice(FrappeTestCase):
 		self.assertEqual(len(actual), 4)
 		self.assertEqual(expected, actual)
   
-	def test_sales_invoice_without_sales_order(self):
+	def test_sales_invoice_without_sales_order_TC_S_006(self):
 		setting = frappe.get_doc("Selling Settings")
 		setting.so_required = 'No'
 		setting.save()
@@ -4228,7 +4228,7 @@ class TestSalesInvoice(FrappeTestCase):
 		qty_change_cpu = frappe.db.get_value('Stock Ledger Entry', {'item_code': 'CPU', 'voucher_no': dn.name, 'warehouse': 'Stores - FC'}, 'actual_qty')
 		self.assertEqual(qty_change_cpu, -5)
   
-	def test_sales_invoice_with_update_stock_checked(self):
+	def test_sales_invoice_with_update_stock_checked_TC_S_007(self):
 		si = create_sales_invoice(customer='Indra', company='French Connections', cost_center='Main - FC', selling_price_list='Standard Selling', 
                             	item_code='CPU', qty=5, rate=3000, income_account='Sales - FC', expense_account='Cost of Goods Sold - FC',
                              	debit_to='Debtors - FC', warehouse='Stores - FC', do_not_submit=True)
@@ -4253,7 +4253,7 @@ class TestSalesInvoice(FrappeTestCase):
 		si2_acc_debit = frappe.db.get_value('GL Entry', {'voucher_type': 'Sales Invoice', 'voucher_no': si.name, 'account': 'Debtors - FC'}, 'debit')
 		self.assertEqual(si2_acc_debit, 15000)
   
-	def test_sales_invoice_without_sales_order_with_gst(self):
+	def test_sales_invoice_without_sales_order_with_gst_TC_S_016(self):
 		setting = frappe.get_doc("Selling Settings")
 		setting.so_required = 'No'
 		setting.save()
@@ -4311,7 +4311,7 @@ class TestSalesInvoice(FrappeTestCase):
 				dn_acc_debit = frappe.db.get_value('GL Entry', {'voucher_type': 'Delivery Note', 'voucher_no': dn.name, 'account': 'Cost of Goods Sold - PP Ltd'}, 'debit')
 				self.assertEqual(dn_acc_debit, monitor_sl[0].get("valuation_rate") * 4)
     
-	def test_sales_invoice_with_update_stock_checked_with_gst(self): 
+	def test_sales_invoice_with_update_stock_checked_with_gst_TC_S_017(self): 
 		company = frappe.get_all("Company", {"name": "PP Ltd"}, ["gstin", "gst_category"])
 		customer = frappe.get_all("Customer", {"name": "Ashish"}, ["gstin", "gst_category"])
 		company_add = frappe.get_all("Address", {"name": "PP-MH-Billing"}, ["name", "gstin", "gst_category"])
