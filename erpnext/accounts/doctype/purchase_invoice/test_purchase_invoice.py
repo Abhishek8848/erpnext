@@ -2976,6 +2976,86 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		create_unreconcile_doc_for_selection(selections = json.dumps([selection]))
 		pi_status_after_reconcile = frappe.db.get_value("Purchase Invoice", pi.name, "status")
 		self.assertEqual(pi_status_after_reconcile, "Unpaid")
+	
+	def test_partly_paid_of_pi_to_pr_to_pe_TC_B_081(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_payment_entry
+		pi = make_purchase_invoice(
+			qty=1,
+			item_code="_Test Item",
+			supplier = "_Test Supplier",
+			company = "_Test Company",
+			rate = 500
+		)
+
+		pi.save()
+		pi.submit()
+
+		pr = frappe.new_doc('Payment Request')
+		pr.payment_request_type = "Outward"
+		pr.party_type = "Supplier"
+		pr.party = "_Test Supplier"
+		pr.reference_doctype = "Purchase Invoice"
+		pr.reference_name = pi.name
+		pr.grand_total = 250
+
+		pr.save()
+		pr.submit()
+
+		pe = create_payment_entry(
+			company="_Test Company",
+			payment_type="Pay",
+			party_type="Supplier",
+			party=f"_Test Supplier",
+			paid_to="Creditors - _TC",
+			paid_from ="Cash - _TC",
+			paid_amount=pr.grand_total,
+		)
+		pe.append("references", {"reference_doctype": "Purchase Invoice", "reference_name": pi.name,"allocated_amount":pr.grand_total})
+		pe.save()
+		pe.submit()
+
+		pi_status = frappe.db.get_value("Purchase Invoice", pi.name, "status")
+		self.assertEqual(pi_status, "Partly Paid")
+	
+	def test_fully_paid_of_pi_to_pr_to_pe_TC_B_082(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_payment_entry
+		pi = make_purchase_invoice(
+			qty=1,
+			item_code="_Test Item",
+			supplier = "_Test Supplier",
+			company = "_Test Company",
+			rate = 500
+		)
+
+		pi.save()
+		pi.submit()
+
+		pr = frappe.new_doc('Payment Request')
+		pr.payment_request_type = "Outward"
+		pr.party_type = "Supplier"
+		pr.party = "_Test Supplier"
+		pr.reference_doctype = "Purchase Invoice"
+		pr.reference_name = pi.name
+		pr.grand_total = 500
+
+		pr.save()
+		pr.submit()
+
+		pe = create_payment_entry(
+			company="_Test Company",
+			payment_type="Pay",
+			party_type="Supplier",
+			party="_Test Supplier",
+			paid_to="Creditors - _TC",
+			paid_from ="Cash - _TC",
+			paid_amount=pr.grand_total,
+		)
+		pe.append("references", {"reference_doctype": "Purchase Invoice", "reference_name": pi.name,"allocated_amount":pr.grand_total})
+		pe.save()
+		pe.submit()
+
+		pi_status = frappe.db.get_value("Purchase Invoice", pi.name, "status")
+		self.assertEqual(pi_status, "Paid")
 
 def set_advance_flag(company, flag, default_account):
 	frappe.db.set_value(
