@@ -2156,19 +2156,40 @@ class TestPurchaseOrder(FrappeTestCase):
 			"rate" : 10000,
 			"apply_discount_on" : "Net Total",
 			"additional_discount_percentage" :10 ,
+			"do_not_submit":1
 		}
 
-		doc_po = create_purchase_order(**po_data)
+		acc = frappe.new_doc("Account")
+		acc.account_name = "Input Tax IGST"
+		acc.parent_account = "Tax Assets - _TC"
+		acc.company = "_Test Company"
+		account_name = frappe.db.exists("Account", {"account_name" : "Input Tax IGST","company": "_Test Company" })
+		if not account_name:
+			account_name = acc.insert()
 		
+		doc_po = create_purchase_order(**po_data)
+		doc_po.append("taxes", {
+                    "charge_type": "On Net Total",
+                    "account_head": account_name,
+                    "rate": 12,
+                    "description": "Input GST",
+                })
+		doc_po.submit()
 		self.assertEqual(doc_po.discount_amount, 1000)
-		self.assertEqual(doc_po.grand_total, 9000)
-
+		self.assertEqual(doc_po.grand_total, 10080)
 
 		doc_pr = make_pr_for_po(doc_po.name)
 		doc_pi = make_pi_against_pr(doc_pr.name)
 
 		self.assertEqual(doc_pi.discount_amount, 1000)
-		self.assertEqual(doc_pi.grand_total, 9000)
+		self.assertEqual(doc_pi.grand_total, 10080)
+
+		# Accounting Ledger Checks
+		pi_gl_entries = frappe.get_all("GL Entry", filters={"voucher_no": doc_pi.name}, fields=["account", "debit", "credit"])
+
+		# PI Ledger Validation
+		pi_total = sum(entry["debit"] for entry in pi_gl_entries)
+		self.assertEqual(pi_total, 10080) 
 
 	def test_po_additional_discount_TC_B_055(self):
 		# Scenario : PO => PI [With Additional Discount]
@@ -2183,18 +2204,40 @@ class TestPurchaseOrder(FrappeTestCase):
 			"rate" : 10000,
 			"apply_discount_on" : "Net Total",
 			"additional_discount_percentage" :10 ,
+			"do_not_submit":1
 		}
 
-		doc_po = create_purchase_order(**po_data)
+		acc = frappe.new_doc("Account")
+		acc.account_name = "Input Tax IGST"
+		acc.parent_account = "Tax Assets - _TC"
+		acc.company = "_Test Company"
+		account_name = frappe.db.exists("Account", {"account_name" : "Input Tax IGST","company": "_Test Company" })
+		if not account_name:
+			account_name = acc.insert()
 		
+		doc_po = create_purchase_order(**po_data)
+		doc_po.append("taxes", {
+                    "charge_type": "On Net Total",
+                    "account_head": account_name,
+                    "rate": 12,
+                    "description": "Input GST",
+                })
+		doc_po.submit()
 		self.assertEqual(doc_po.discount_amount, 1000)
-		self.assertEqual(doc_po.grand_total, 9000)
+		self.assertEqual(doc_po.grand_total, 10080)
 
 		doc_pi = make_pi_from_po(doc_po.name)
 		doc_pi.insert()
 		doc_pi.submit()
 		self.assertEqual(doc_pi.discount_amount, 1000)
-		self.assertEqual(doc_pi.grand_total, 9000)
+		self.assertEqual(doc_pi.grand_total, 10080)
+
+		# Accounting Ledger Checks
+		pi_gl_entries = frappe.get_all("GL Entry", filters={"voucher_no": doc_pi.name}, fields=["account", "debit", "credit"])
+
+		# PI Ledger Validation
+		pi_total = sum(entry["debit"] for entry in pi_gl_entries)
+		self.assertEqual(pi_total, 10080) 
 
 
 def create_po_for_sc_testing():
@@ -2329,6 +2372,7 @@ def create_purchase_order(**args):
 	po.apply_discount_on = args.apply_discount_on or None
 	po.additional_discount_percentage = args.additional_discount_percentage or None
 	po.discount_amount = args.discount_amount or None
+	
 
 	if args.rm_items:
 		for row in args.rm_items:
@@ -2437,3 +2481,9 @@ def check_payment_gl_entries(
 	for row in range(len(expected_gle)):
 		for field in ["account", "debit", "credit"]:
 			self.assertEqual(expected_gle[row][field], gl_entries[row][field])
+
+@frappe.whitelist()
+def run_tests():
+	test_obj = TestPurchaseOrder()
+	test_obj.test_po_additional_discount_TC_B_052()
+	return 1
