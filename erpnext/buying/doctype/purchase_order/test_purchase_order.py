@@ -1699,26 +1699,37 @@ class TestPurchaseOrder(FrappeTestCase):
 			"company" : "_Test Company",
 			"item_code" : "_Test Item",
 			"warehouse" : "Stores - _TC",
+			"supplier": "_Test Supplier",
+            "schedule_date": "2025-01-13",
 			"qty" : 1,
 			"rate" : 130,
 		}
-		
-		pricing_rule_doc = frappe.get_doc({
-            "doctype": "Pricing Rule",
-            "title": "Discount on Tissue",
-            "apply_on": "Item Code",
-            "item_code": "_Test Item",
-            "apply_on_uom": "Nos",
-            "price_or_product_discount": "Price",
-            "applicable_for": "Supplier",
-            "party": "Unicon",
-            "min_qty": 1,
-            "min_amount": 100,
-            "valid_from": "2025-01-01",
-            "rate_or_discount": "Discount Percentage",
-            "discount_percentage": 10,
-            "price_list": "Standard Buying"
-        }).insert()
+
+		pricing_rule_record = {
+			"doctype": "Pricing Rule",
+			"title": "Discount on _Test Item",
+			"apply_on": "Item Code",
+			"items": [
+				{
+					"item_code": "_Test Item",
+				}
+				],
+			"price_or_product_discount": "Price",
+			"applicable_for": "Supplier",
+			"supplier": "_Test Supplier",
+			"buying": 1,
+			"currency": "INR",
+			
+			"min_qty": 1,
+			"min_amt": 100,
+			"valid_from": "2025-01-01",
+			"rate_or_discount": "Discount Percentage",
+			"discount_percentage": 10,
+			"price_list": "Standard Buying"
+
+		}
+		rule = frappe.get_doc(pricing_rule_record)
+		rule.insert()
 		
 		doc_po = create_purchase_order(**po_data)
 		doc_po = doc_po.items[0]
@@ -1737,33 +1748,38 @@ class TestPurchaseOrder(FrappeTestCase):
 		# Scenario : PO => Pricing Rule => PR 
 		
 		po_data = {
-            "company": "_Test Company",
-            "supplier": "Unicon",
-            "schedule_date": "2024-12-23",
-            "items": [{
-                "item_code": "_Test Item",
-                "warehouse": "Stores - _TC",
-                "qty": 1,
-                "rate": 130  # Original Rate
-            }]
-        }
-		
-		pricing_rule_doc = frappe.get_doc({
-            "doctype": "Pricing Rule",
-            "title": "Discount on Tissue",
-            "apply_on": "Item Code",
-            "item_code": "_Test Item",
-            "apply_on_uom": "Nos",
-            "price_or_product_discount": "Price",
-            "applicable_for": "Supplier",
-            "party": "Unicon",
-            "min_qty": 1,
-            "min_amount": 100,
-            "valid_from": "2025-01-01",
-            "rate_or_discount": "Discount Percentage",
-            "discount_percentage": 10,
-            "price_list": "Standard Buying"
-        }).insert()
+			"company" : "_Test Company",
+			"item_code" : "_Test Item",
+			"warehouse" : "Stores - _TC",
+			"supplier": "_Test Supplier",
+            "schedule_date": "2025-01-13",
+			"qty" : 1,
+			"rate" : 130,
+		}
+
+		pricing_rule_record = {
+			"doctype": "Pricing Rule",
+			"title": "Discount on _Test Item",
+			"apply_on": "Item Code",
+			"items": [
+				{
+					"item_code": "_Test Item",
+				}
+				],
+			"price_or_product_discount": "Price",
+			"applicable_for": "Supplier",
+			"supplier": "_Test Supplier",
+			"buying": 1,
+			"currency": "INR",
+			
+			"min_qty": 1,
+			"min_amt": 100,
+			"valid_from": "2025-01-01",
+			"rate_or_discount": "Discount Percentage",
+			"discount_percentage": 10,
+			"price_list": "Standard Buying"
+
+		}
 		
 		doc_po = create_purchase_order(**po_data)
 		po_item = doc_po.items[0]
@@ -2015,3 +2031,9 @@ def check_payment_gl_entries(
 	for row in range(len(expected_gle)):
 		for field in ["account", "debit", "credit"]:
 			self.assertEqual(expected_gle[row][field], gl_entries[row][field])
+
+@frappe.whitelist()
+def run_tests():
+	test_obj = TestPurchaseOrder()
+	test_obj.test_po_with_pricing_rule_TC_B_046()
+	return 1
