@@ -40,6 +40,7 @@ from erpnext.stock.doctype.stock_reconciliation.test_stock_reconciliation import
 )
 from erpnext.stock.utils import get_incoming_rate, get_stock_balance
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_inter_company_purchase_invoice
 
 
 class TestSalesInvoice(FrappeTestCase):
@@ -5146,9 +5147,11 @@ class TestSalesInvoice(FrappeTestCase):
 		sales_invoice.save()
 		sales_invoice.submit()
 		expected_gl_entries = [
-			['Debtors - _TC', sales_invoice.grand_total, 0.0, sales_invoice.posting_date],
-			['Deferred Revenue - _TC', 0.0, sales_invoice.grand_total, sales_invoice.posting_date]
-		]
+                ['Cost of Goods Sold - _TC', 100.0, 0.0, sales_invoice.posting_date],
+                ['Stock In Hand - _TC', 0.0, 100.0, sales_invoice.posting_date],
+                ['Debtors - _TC', sales_invoice.grand_total, 0.0, sales_invoice.posting_date],
+                ['Deferred Revenue - _TC', 0.0, sales_invoice.grand_total, sales_invoice.posting_date]
+        ]
 		check_gl_entries(self, sales_invoice.name, expected_gl_entries, sales_invoice.posting_date)
     
 	def test_deferred_revenue_invoice_multiple_item_TC_ACC_040(self):
@@ -5658,7 +5661,77 @@ class TestSalesInvoice(FrappeTestCase):
 		si.submit()
 		self.assertEqual(si.status, "Unpaid")	
 
-    
+	def test_si_with_sr_calculate_with_fixed_TC_S_139(self):
+		from erpnext.accounts.doctype.shipping_rule.test_shipping_rule import create_shipping_rule
+
+		shipping_rule = create_shipping_rule(
+			shipping_rule_type="Selling", 
+			shipping_rule_name="Shipping Rule - Test Fixed",
+			args={"calculate_based_on": "Fixed", "shipping_amount": 100}
+    	)
+		self.assertEqual(shipping_rule.docstatus, 1)
+		make_stock_entry(item_code="_Test Item", qty=10, rate=500, target="_Test Warehouse - _TC")
+		si = create_sales_invoice(qty=5,rate=200, do_not_submit=True)
+
+		si.shipping_rule = shipping_rule.name
+		si.save()
+		si.submit()
+
+		self.assertEqual(si.net_total, 1000)
+
+		self.assertEqual(si.total_taxes_and_charges, 100)
+		self.assertEqual(si.grand_total, 1100)
+
+	def test_si_with_sr_calculate_with_net_total_TC_S_140(self):
+		from erpnext.accounts.doctype.shipping_rule.test_shipping_rule import create_shipping_rule
+
+		shipping_rule = create_shipping_rule(
+			shipping_rule_type="Selling", 
+			shipping_rule_name="Shipping Rule - Test Net Total",
+			args={"calculate_based_on": "Net Total"}
+    	)
+		self.assertEqual(shipping_rule.docstatus, 1)
+		make_stock_entry(item_code="_Test Item", qty=10, rate=500, target="_Test Warehouse - _TC")
+		si = create_sales_invoice(qty=5,rate=200, do_not_submit=True)
+
+		si.shipping_rule = shipping_rule.name
+		si.save()
+		si.submit()
+
+		self.assertEqual(si.net_total, 1000)
+
+		self.assertEqual(si.total_taxes_and_charges, 200)
+		self.assertEqual(si.grand_total, 1200)
+		
+	def test_si_with_sr_calculate_with_net_weight_TC_S_141(self):
+		from erpnext.accounts.doctype.shipping_rule.test_shipping_rule import create_shipping_rule
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
+
+
+		shipping_rule = create_shipping_rule(
+			shipping_rule_type="Selling", 
+			shipping_rule_name="Shipping Rule - Test Net Weight",
+			args={"calculate_based_on": "Net Weight"}
+    	)
+		self.assertEqual(shipping_rule.docstatus, 1)
+		
+		item=make_test_item("_Test Item 1")
+		item.weight_per_unit =250
+		item.weight_uom ="Nos"
+		item.save
+		make_stock_entry(item_code="_Test Item 1", qty=10, rate=500, target="_Test Warehouse - _TC")
+		si = create_sales_invoice(item=item.name, qty=5,rate=200, do_not_submit=True)
+
+		si.shipping_rule = shipping_rule.name
+		si.items[0].weight_per_unit = 250
+		si.items[0].weight_uom = 'Nos'
+		si.save()
+		si.submit()
+
+		self.assertEqual(si.net_total, 1000)
+		self.assertEqual(si.total_taxes_and_charges, 200)
+		self.assertEqual(si.grand_total, 1200)
+
 	def test_fetch_payment_terms_from_order_TC_ACC_129(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import (
 			make_test_item
@@ -5813,7 +5886,222 @@ class TestSalesInvoice(FrappeTestCase):
 		si.tax_category=tax_category
 		si.save()
 		self.assertEqual(tax_category,si.tax_category)
+  
+	def test_determine_address_tax_category_from_shipping_address_TC_ACC_135(self):
 		
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
+		from erpnext.accounts.party import get_address_tax_category
+		address_args = [
+				{	"name":"_Test Company Address-Office",
+					"address_title": "_Test Company Address",
+					"address_type": "Office",
+					"is_primary_address": 1,
+					"state": "Maharashtra",
+					"pincode":"423701",
+					"address_line1":"Test Address 10",
+					"country": "India",
+					"is_your_company_address": 1,
+					"company": "_Test Company"
+				},
+				
+				{	"name":"Customer Billing Address-Billing",
+					"address_title": "Customer Billing Address",
+					"address_type": "Billing",
+					"is_primary_address": 0,
+					"address_line1":"Test Address 11",
+					"state": "Karnataka",
+					"pincode":"587316",
+					"country": "India",
+					"is_your_company_address": 0,
+					"doctype": "Customer",
+					"docname": "_Test Customer"
+				},
+				
+				{	"name":"Customer Shipping Address-Shipping",
+					"address_title": "Customer Shipping Address",
+					"address_type": "Shipping",
+					"is_primary_address": 0,
+					"address_line1":"Test Address 11",
+					"state": "Kerala",
+					"pincode":"686582",
+					"country": "India",
+					"is_your_company_address": 0,
+					"doctype": "Customer",
+					"docname": "_Test Customer"
+				}
+		]
+		for d in address_args:
+			create_address(**d)
+
+		company_address = frappe.get_doc("Address","_Test Company Address-Office")
+		customer_shipping = frappe.get_doc("Address","Customer Billing Address-Billing")
+		if company_address.state and customer_shipping.state and company_address.state == customer_shipping.state:
+			customer_shipping.tax_category="In-State"
+		else:
+			customer_shipping.tax_category="Out-State"
+		customer_shipping.save()
+  
+		account_setting= frappe.get_doc("Accounts Settings")
+		account_setting.determine_address_tax_category_from="Billing Address"
+		account_setting.save()
+
+		self.assertEquals("Billing Address",account_setting.determine_address_tax_category_from)
+
+		item = make_test_item("_Test Item")
+		tax_category=get_address_tax_category(None,customer_shipping.name,None)
+		si = create_sales_invoice(
+				customer="_Test Customer",
+				company="_Test Company",
+				item_code=item.name,
+				qty=1,
+				rate=1000,
+				do_not_submit=True
+		)
+		si.customer_address=customer_shipping.name
+		si.company_address=company_address.name
+		si.tax_category=tax_category
+		si.save()
+		self.assertEqual(tax_category,si.tax_category)
+
+	def test_si_to_pi_for_service_internal_transfer_TC_B_126(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
+		get_required_data = create_company_and_supplier()
+		parent_company = get_required_data.get("parent_company")
+		child_company = get_required_data.get("child_company")
+		supplier = get_required_data.get("supplier")
+		customer = get_required_data.get("customer")
+		price_list = get_required_data.get("price_list")
+		item_name = make_test_item("test_service")
+
+		si = frappe.get_doc(
+			{
+				"doctype": "Sales Invoice",
+				"company": parent_company,
+				"customer": customer,
+				"due_date": today(),
+				"currency": "INR",
+				"selling_price_list": price_list,
+				"items": [
+					{
+						"item_code": item_name,
+						"qty": 1,
+						"rate": 1000,
+					}
+				]
+			}
+		)
+		si.insert()
+		si.submit()
+		self.assertEqual(si.company, parent_company)
+		self.assertEqual(si.customer, customer)
+		self.assertEqual(si.selling_price_list, price_list)
+		self.assertEqual(si.items[0].rate, 1000)
+		self.assertEqual(si.total, 1000)
+		self.assertEqual(si.total_taxes_and_charges, 180)
+		self.assertEqual(si.grand_total, 1180)
+		
+		gle_entries = frappe.get_all("GL Entry", filters={"voucher_no": si.name}, fields=["account", "debit", "credit"])
+		expected_si_entries = {
+			"Debtors - TC-1": {"debit": 1180, "credit": 0},
+			"Output Tax CGST - TC-1": {"debit": 0, "credit": 90},
+			"Output Tax SGST - TC-1": {"debit": 0, "credit": 90},
+			"Sales - TC-1": {"debit": 0, "credit": 1000},
+		}
+		for entry in gle_entries:
+			self.assertEqual(entry["debit"], expected_si_entries.get(entry["account"], {}).get("debit", 0))
+			self.assertEqual(entry["credit"], expected_si_entries.get(entry["account"], {}).get("credit", 0))
+
+		pi = make_inter_company_purchase_invoice(si.name)
+		pi.bill_no = "test bill"
+		pi.insert()
+		pi.submit()
+		self.assertEqual(pi.company, child_company)
+		self.assertEqual(pi.supplier, supplier)
+		self.assertEqual(pi.items[0].rate, 1000)
+		self.assertEqual(pi.total, 1000)
+		self.assertEqual(pi.total_taxes_and_charges, 180)
+		self.assertEqual(pi.grand_total, 1180)
+
+		gle_entries_pi = frappe.get_all("GL Entry", filters={"voucher_no": pi.name}, fields=["account", "debit", "credit"])
+		expected_pi_entries = {
+			"Stock Received But Not Billed - TC-3": {"debit": 1000, "credit": 0},
+			"Input Tax CGST - TC-3": {"debit": 90, "credit": 0},
+			"Input Tax SGST - TC-3": {"debit": 90, "credit": 0},
+			"Creditors - TC-3": {"debit": 0, "credit": 1180},
+		}
+		for entry in gle_entries_pi:
+			self.assertEqual(entry["debit"], expected_pi_entries.get(entry["account"], {}).get("debit", 0))
+			self.assertEqual(entry["credit"], expected_pi_entries.get(entry["account"], {}).get("credit", 0))
+
+  
+	def test_sales_invoice_with_child_item_rates_of_product_bundle_TC_S_152(self):
+		from erpnext.selling.doctype.product_bundle.test_product_bundle import make_product_bundle
+		from erpnext.stock.doctype.item.test_item import make_item
+  
+		selling_setting = frappe.get_doc('Stock Settings')
+		selling_setting.editable_bundle_item_rates = 1
+		selling_setting.save()
+  
+		if not frappe.db.exists("Item", "_Test Product Bundle Item New"):
+			bundle_item = make_item("_Test Product Bundle Item New", {"is_stock_item": 0})
+			bundle_item.append(
+				"item_defaults", {"company": "_Test Company", "default_warehouse": "_Test Warehouse - _TC"}
+			)
+			bundle_item.save(ignore_permissions=True)
+
+		make_item("_Packed Item New 1", {"is_stock_item": 1})
+		make_product_bundle("_Test Product Bundle Item New", ["_Packed Item New 1"], 2)
+
+		si = create_sales_invoice(
+			item_code="_Test Product Bundle Item New",
+			update_stock=1,
+			warehouse="_Test Warehouse - _TC",
+			transaction_date=add_days(nowdate(), -1),
+			do_not_submit=1,
+		)
+
+		make_stock_entry(item="_Packed Item New 1", target="_Test Warehouse - _TC", qty=120, rate=100)
+
+		si.transaction_date = nowdate()
+		si.save()
+		si.submit()
+		
+		self.assertEqual(si.status, "Unpaid")
+		self.assertEqual(si.grand_total, 100)
+  
+	def test_sales_invoice_creating_dunning_from_si_TC_S_154(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
+  
+		item = make_test_item("_Test Item")
+		si = create_sales_invoice(
+				customer="_Test Customer",
+				company="_Test Company",
+				item_code=item.name,
+				qty=1,
+				rate=1000,
+				do_not_submit=False
+		)
+
+		self.assertEqual(si.status, "Unpaid")
+  
+		if not frappe.db.exists("Dunning Type", "_Test Dunning"):
+			dun_type = frappe.new_doc("Dunning Type")
+			dun_type.dunning_type = "_Test Dunning"
+			dun_type.company = "_Test Company"
+			dun_type.rate_of_interest = 5.0
+			dun_type.save()
+  
+		from erpnext.accounts.doctype.sales_invoice.sales_invoice import create_dunning
+		dun = create_dunning(si.name)
+		dun.posting_date = add_days(nowdate(), 1)
+		dun.dunning_type = "_Test Dunning"
+		dun.rate_of_interest = 5.0
+		dun.save()
+		dun.submit()
+		dun.reload()
+		
+		self.assertEqual(dun.grand_total, 1000.136986301)
+  
 def set_advance_flag(company, flag, default_account):
 	frappe.db.set_value(
 		"Company",
@@ -6208,3 +6496,151 @@ def create_address(**args):
 		address.save()
 		frappe.db.commit()
 		return address
+
+def create_company_and_supplier():
+	parent_company= "Test Company-1122"
+	child_company = "Test Company-3344"
+	price_list = "Test Inter Company Transfer"
+	supplier = "Test Company-1122"
+	customer = "Test Company-3344"
+
+	if not frappe.db.exists("Company", parent_company):
+		frappe.get_doc(
+			{
+				"doctype": "Company",
+				"company_name": parent_company,
+				"abbr": "TC-1",
+				"default_currency": "INR",
+				"is_group": 1,
+				"gstin": "27AAAAP0267H2ZN",
+				"gst_category": "Registered Regular"
+			}
+		).insert()
+
+	if not frappe.db.exists("Company", child_company):
+		frappe.get_doc(
+			{
+				"doctype": "Company",
+				"company_name": child_company,
+				"abbr": "TC-3",
+				"default_currency": "INR",
+				"gstin": "27AABCT1296R1ZN",
+				"gst_category": "Registered Regular",
+				"parent_company": parent_company
+			}
+		).insert()
+
+	if not frappe.db.exists("Price List", price_list):
+		frappe.get_doc(
+			{
+				"doctype": "Price List",
+				"price_list_name": price_list,
+				"currency": "INR",
+				"buying": 1,
+				"selling": 1,
+				"countries": [
+					{
+						"country": "India"
+					}
+				]
+			}
+		).insert()
+
+	if not frappe.db.exists("Supplier", supplier):
+		frappe.get_doc(
+			{
+				"doctype": "Supplier",
+				"supplier_name": parent_company,
+				"supplier_type": "Individual",
+				"country": "India",
+				"default_price_list": price_list,
+				"is_internal_supplier": 1,
+				"represents_company": parent_company,
+				"companies": [
+					{
+						"company": child_company
+					}
+				]
+			}
+		).insert()
+
+		frappe.get_doc(
+			{
+				"doctype":"Address",
+				"address_title": parent_company,
+				"address_type": "Billing",
+				"address_line1": "GP Parsik Sahakari Bank, Second Floor",
+				"address_line2": "Sahkarmurti Gopinath Shivram Patil Bhavan MBT Road",
+				"city": "Thane",
+				"state": "Maharashtra",
+				"country": "India",
+				"pincode": "400605",
+				"gstin": "27AAAAP0267H2ZN",
+				"gst_category": "Registered Regular",
+				"is_your_company_address": 1,
+				"links": [
+					{
+						"link_doctype": "Company",
+						"link_name": parent_company
+					},
+					{
+						"link_doctype": "Supplier",
+						"link_name": supplier
+					}
+				]
+			}
+		).insert()
+
+	if not frappe.db.exists("Customer", customer):
+		frappe.get_doc(
+			{
+				"doctype": "Customer",
+				"customer_name": child_company,
+				"customer_type": "Company",
+				"country": "India",
+				"default_price_list": price_list,
+				"is_internal_customer": 1,
+				"represents_company": child_company,
+				"companies": [
+					{
+						"company": parent_company
+					}
+				]
+			}
+		).insert()
+
+		frappe.get_doc(
+			{
+				"doctype":"Address",
+				"address_title": child_company,
+				"address_type": "Billing",
+				"address_line1": "M1, 5, Empire Plaza Building A",
+				"address_line2": "L B S Road, Off. Village Hariyali, Vikhroli West",
+				"city": "Mumbai",
+				"state": "Maharashtra",
+				"country": "India",
+				"pincode": "400083",
+				"gstin": "27AABCT1296R1ZN",
+				"gst_category": "Registered Regular",
+				"is_your_company_address": 1,
+				"links": [
+					{
+						"link_doctype": "Company",
+						"link_name": child_company
+					},
+					{
+						"link_doctype": "Customer",
+						"link_name": customer
+					}
+				]
+			}
+		).insert()
+	frappe.db.commit()
+
+	return {
+		"parent_company": parent_company,
+		"child_company": child_company,
+		"supplier": supplier,
+		"customer": customer,
+		"price_list": price_list
+	}

@@ -11,10 +11,6 @@ from erpnext.accounts.doctype.account.test_account import create_account, get_in
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 from erpnext.buying.doctype.purchase_order.purchase_order import get_mapped_purchase_invoice
 from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_invoice as make_pi_from_po
-from erpnext.buying.doctype.purchase_order.test_purchase_order import (
-	create_pr_against_po,
-	create_purchase_order,
-)
 from erpnext.buying.doctype.supplier.test_supplier import create_supplier
 from erpnext.controllers.accounts_controller import get_payment_terms
 from erpnext.controllers.buying_controller import QtyMismatchError
@@ -1387,6 +1383,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 	@change_settings("Accounts Settings", {"unlink_payment_on_cancellation_of_invoice": 1})
 	def test_purchase_invoice_advance_taxes(self):
 		from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import create_purchase_order
 
 		company = "_Test Company"
 
@@ -1989,6 +1986,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 
 	@change_settings("Buying Settings", {"supplier_group": None})
 	def test_purchase_invoice_without_supplier_group(self):
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import create_purchase_order
 		# Create a Supplier
 		test_supplier_name = "_Test Supplier Without Supplier Group"
 		if not frappe.db.exists("Supplier", test_supplier_name):
@@ -3818,7 +3816,39 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 					total_amount += item_wise_tax_detail["_Test GST Item"][1]
 			self.assertEquals(total_tax,rate.get('total_tax'))
 			self.assertEquals(total_amount,rate.get('total_amount'))
-  
+	def test_supplier_invoice_number_uniqueness_validation_TC_ACC_136(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
+
+		account_setting=frappe.get_doc("Accounts Settings")
+		account_setting.check_supplier_invoice_uniqueness=1
+		account_setting.save()
+		item = make_test_item("_Test Item")
+
+		pi = make_purchase_invoice(
+			supplier="_Test Supplier",
+			company="_Test Company",
+			item_code=item.name,
+			qty=1,
+			rate=1000,
+			do_not_submit=True
+		)
+		pi.bill_no="ADF01234"
+		pi.save()
+		pi.submit()
+		try:
+			_pi = make_purchase_invoice(
+				supplier="_Test Supplier",
+				company="_Test Company",
+				item_code=item.name,
+				qty=1,
+				rate=1000,
+				do_not_submit=True
+			)
+			_pi.bill_no="ADF01234"
+			_pi.save()
+		except Exception as e:
+			error_msg = str(e)
+			self.assertEqual(error_msg, f'Supplier Invoice No exists in Purchase Invoice {pi.name}')
 	
 def set_advance_flag(company, flag, default_account):
 	frappe.db.set_value(
