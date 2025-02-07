@@ -8311,32 +8311,3 @@ def get_tax_template(company, tax_template, rate):
 		tax_template.insert(ignore_if_duplicate=True)
 
 		return tax_template.name
-
-def create_quality_inspection_template(template):
-	if not frappe.db.exists(template):
-		qi_template = frappe.get_doc(
-			{
-			"doctype":"Quality Inspection Template",
-			"item_quality_inspection_parameter":[
-				{
-					"specification":"Needle Shape",
-					"value":"OK"
-				},
-				{
-					"specification":"Syringe Shape",
-					"value":"OK"
-				},
-				{
-					"specification":"Plastic Clarity",
-					"value":"OK"
-				},
-				{
-					"specification":"Syringe Length",
-					"min_value":4,
-					"max_value":6
-				},
-			]
-			}
-		)
-		qi_template.insert(ignore_if_duplicate=True)
-		return qi_template.name
