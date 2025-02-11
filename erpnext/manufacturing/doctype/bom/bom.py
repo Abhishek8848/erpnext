@@ -1118,7 +1118,7 @@ def get_bom_items_as_dict(
 ):
 	item_dict = {}
 	include_project = "projects" in frappe.get_installed_apps()
-	project_column = ", bom.project" if include_project else ""
+	project_column = "bom.project" if include_project else ""
 	project_group_by = "bom.project," if include_project else ""
 	# Did not use qty_consumed_per_unit in the query, as it leads to rounding loss
 	query = """select
@@ -1161,14 +1161,13 @@ def get_bom_items_as_dict(
                 item_default.expense_account,
                 item_default.buying_cost_center,
 				{group_by_fields}
-			order by bom_item.idx""".format(
-			project_column=project_column,	
-			project_group_by=project_group_by,
-		)
+			order by bom_item.idx"""
 
 	is_stock_item = 0 if include_non_stock_items else 1
 	if cint(fetch_exploded):
 		query = query.format(
+			project_column=project_column,	
+			project_group_by=project_group_by,
 			table="BOM Explosion Item",
 			group_by_fields = """bom_item.source_warehouse, bom_item.operation, bom_item.include_item_in_manufacturing, bom_item.description,
                 bom_item.sourced_by_supplier""",
@@ -1185,6 +1184,8 @@ def get_bom_items_as_dict(
 		)
 	elif fetch_scrap_items:
 		query = query.format(
+			project_column=project_column,	
+			project_group_by=project_group_by,
 			table="BOM Scrap Item",
 			group_by_fields = """item.description""",
 			where_conditions="",
@@ -1196,6 +1197,8 @@ def get_bom_items_as_dict(
 		items = frappe.db.sql(query, {"qty": qty, "bom": bom, "company": company}, as_dict=True)
 	else:
 		query = query.format(
+			project_column=project_column,	
+			project_group_by=project_group_by,
 			table="BOM Item",
 			group_by_fields = """bom_item.source_warehouse, bom_item.operation, bom_item.include_item_in_manufacturing, bom_item.uom, bom_item.conversion_factor, bom_item.description,
                 bom_item.sourced_by_supplier, bom_item.base_rate""",
