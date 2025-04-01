@@ -135,6 +135,7 @@ def add_call_summary_and_call_type(call_log, summary, call_type):
 	doc.save()
 	doc.add_comment("Comment", frappe.bold(_("Call Summary")) + "<br><br>" + summary)
 
+@if_app_installed("custom_crm")
 def get_employees_with_number(number):
 	from erpnext_crm.erpnext_crm.doctype.utils import get_scheduled_employees_for_popup, strip_number
 	number = strip_number(number)
@@ -155,6 +156,7 @@ def get_employees_with_number(number):
 
 	return employee_doc_name_and_emails
 
+@if_app_installed("custom_crm")
 def link_existing_conversations(doc, state):
 	from erpnext_crm.erpnext_crm.doctype.utils import get_scheduled_employees_for_popup, strip_number
 	"""
