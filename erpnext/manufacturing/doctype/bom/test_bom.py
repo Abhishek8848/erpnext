@@ -31,8 +31,6 @@ from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_r
 from erpnext.stock.doctype.purchase_receipt.purchase_receipt import make_purchase_invoice 
 from erpnext.subcontracting.doctype.subcontracting_order.subcontracting_order import make_subcontracting_receipt
 
-from erpnext.accounts.doctype.fiscal_year.test_fiscal_year import create_fiscal_year
-
 test_records = frappe.get_test_records("BOM")
 test_dependencies = ["Item", "Quality Inspection Template"]
 
@@ -769,6 +767,7 @@ class TestBOM(FrappeTestCase):
 		self.assertTrue("_Test RM Item 3 Manufacture Item" in items)
 	
 	def test_subcontrcting_supply_raw_material_TC_B_100(self):
+		from erpnext.accounts.doctype.fiscal_year.test_fiscal_year import create_fiscal_year
 		create_fiscal_year("_Test Company")
 		item_1 = create_item(item_code="Testing Service", is_stock_item=0)
 		item_1.item_group = "Services"
@@ -832,6 +831,7 @@ class TestBOM(FrappeTestCase):
 		self.assertEqual(pi.status, "Paid")
 	
 	def test_subcontrcting_supply_raw_material_TC_B_101(self):
+		from erpnext.accounts.doctype.fiscal_year.test_fiscal_year import create_fiscal_year
 		create_fiscal_year("_Test Company")
 		item_1 = create_item(item_code="Testing Service", is_stock_item=0)
 		item_1.item_group = "Services"
