@@ -726,7 +726,7 @@ class TestBOM(FrappeTestCase):
 			else:
 				self.assertEqual(row.is_stock_item, 1)
 
-	@if_app_installed("assets")
+
 	def test_do_not_include_manufacturing_and_fixed_items(self):
 		from erpnext.manufacturing.doctype.bom.bom import item_query
 
