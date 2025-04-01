@@ -138,7 +138,7 @@ def add_call_summary_and_call_type(call_log, summary, call_type):
 
 
 def get_employees_with_number(number):
-	from custom_crm.crm.doctype.utils import get_scheduled_employees_for_popup, strip_number
+	# from custom_crm.crm.doctype.utils import get_scheduled_employees_for_popup, strip_number
 	number = strip_number(number)
 	if not number:
 		return []
