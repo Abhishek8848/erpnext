@@ -2,7 +2,7 @@ name: Postgres ERP Test
 on:
   push:
     branches:
-      - pre-prod
+      - develop
   pull_request:
 concurrency:
   group: postgres-erp-${{ github.event.number }}
@@ -84,31 +84,18 @@ jobs:
       - name: Install Frappe Bench
         run: |
           pip install frappe-bench
-          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" --frappe-path https://github.com/8848digital/frappe --frappe-branch pre-prod ~/frappe-bench
+          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" --frappe-path https://github.com/Abhishek8848/frappe-v15 --frappe-branch version-15 ~/frappe-bench
       - name: Install Apps
         working-directory: /home/runner/frappe-bench
         run: |
-          bench get-app erpnext https://github.com/8848digital/erpnext.git --branch pre-prod
-          bench get-app https://itananddigital:${{secrets.GH_PAT}}@github.com/8848digital/ERPNext-India.git --branch pre-prod
-          bench get-app https://github.com/nirav8848/india_compliance.git --branch pre-prod
-          bench get-app https://github.com/8848digital/Assets --branch pre-prod
-          bench get-app https://itananddigital:${{secrets.GH_PAT}}@github.com/8848digital/CRM --branch pre-prod
-          bench get-app https://itananddigital:${{secrets.GH_PAT}}@github.com/8848digital/projects.git --branch pre-prod
-          bench get-app https://itananddigital:${{secrets.GH_PAT}}@github.com/8848digital/sales_commission.git --branch pre-prod
-          bench get-app --branch version-15 payments
+          bench get-app erpnext https://github.com/Abhishek8848/erpnext --branch version-15
+          # bench get-app --branch version-15 payments
           bench setup requirements --dev
       - name: Create Site
         working-directory: /home/runner/frappe-bench
         run: |
-          bench new-site --db-type postgres --db-root-password root --admin-password admin test_site
+          bench new-site test_site --db-root-password root --admin-password admin
           bench --site test_site install-app erpnext
-          bench --site test_site install-app erpnext_india
-          bench --site test_site install-app assets
-          bench --site test_site install-app erpnext_crm
-          bench --site test_site install-app projects
-          bench --site test_site install-app payments
-          bench --site test_site install-app sales_commission
-          bench --site test_site install-app india_compliance
       - name: Set Permissions & Configs
         working-directory: /home/runner/frappe-bench
         run: |
@@ -130,19 +117,24 @@ jobs:
           python <<EOF
           import xmltodict
           import pandas as pd
+          
           # Read XML File
           xml_file = "/home/runner/frappe-bench/test_results.xml"
           with open(xml_file, 'r', encoding='utf-8') as file:
               xml_content = file.read()
           data = xmltodict.parse(xml_content)
+          
           # Ensure XML structure is valid
           if not isinstance(data, dict):
               raise ValueError("Parsed XML is not a dictionary. Check the XML structure.")
+              
           # Extract test results from different formats
           testsuites = data.get("testsuites", {}).get("testsuite", [])
+          
           # Ensure testsuites is always a list
           if isinstance(testsuites, dict):
               testsuites = [testsuites]
+              
           test_results = []
           for suite in testsuites:
               testcases = suite.get("testcase", [])
@@ -158,8 +150,7 @@ jobs:
                   status = "Failed" if type_value != "Unknown" else "Passed"
                   traceback = type_value if status == "Failed" else ""
                   test_results.append([test_name, status, traceback])
-              print("=======================Count====================")
-              print(count)
+              
           # Convert to CSV
           df = pd.DataFrame(test_results, columns=["Test Name", "Status", "Traceback"])
           df.to_csv("/home/runner/frappe-bench/test_report.csv", index=False)
