@@ -2,7 +2,7 @@ name: Postgres ERP Test
 on:
   push:
     branches:
-      - develop
+      - dev
   pull_request:
 concurrency:
   group: postgres-erp-${{ github.event.number }}
