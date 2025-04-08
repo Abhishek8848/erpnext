@@ -1,5 +1,4 @@
-
-name: Postgres ERP Test
+name: MariaDB ERP Test
 on:
   push:
     branches:
@@ -92,14 +91,27 @@ jobs:
           bench --site test_site set-config developer_mode 1
           bench --site test_site set-config db_host localhost
           bench --site test_site set-config admin_password admin
-      - name: Run Tests
+      # - name: Run Tests
+      #   working-directory: /home/runner/frappe-bench
+      #   run: |
+      #     set +e  # Prevent script exit on failure
+      #     bench --site test_site run-tests --coverage --junit-xml-output /home/runner/frappe-bench/test_results.xml 2>&1 | tee test_output.log
+      #     echo "Tests completed, proceeding with next steps..."
+      #   env:
+      #     TYPE: server
+      - name: Run Tests for All Apps with Coverage
         working-directory: /home/runner/frappe-bench
         run: |
-          set +e  # Prevent script exit on failure
+          set +e
           bench --site test_site run-tests --coverage --junit-xml-output /home/runner/frappe-bench/test_results.xml 2>&1 | tee test_output.log
-          echo "Tests completed, proceeding with next steps..."
-        env:
-          TYPE: server
+          
+          # Process coverage for all apps
+          cd sites/test_site
+          pip install coverage
+          find . -name '*_cov.xml' -exec cp {} . \;
+          coverage combine *_cov.xml
+          coverage xml -o coverage.xml
+          cp coverage.xml /home/runner/frappe-bench/sites/
       - name: Convert Test Results to CSV
         run: |
           pip install xmltodict pandas
