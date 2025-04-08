@@ -84,12 +84,12 @@ jobs:
       - name: Install Frappe Bench
         run: |
           pip install frappe-bench
-          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" --frappe-path https://github.com/Abhishek8848/frappe-v15 --frappe-branch pre-prod ~/frappe-bench
+          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" --frappe-path https://github.com/8848digital/frappe --frappe-branch pre-prod ~/frappe-bench
       - name: Install Apps
         working-directory: /home/runner/frappe-bench
         run: |
-          bench get-app erpnext https://github.com/Abhishek8848/erpnext --branch pre-prod
-          # bench get-app --branch version-15 payments
+          bench get-app erpnext https://github.com/8848digital/erpnext --branch pre-prod
+          bench get-app --branch version-15 payments
           bench setup requirements --dev
       - name: Create Site
         working-directory: /home/runner/frappe-bench
